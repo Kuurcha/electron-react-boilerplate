@@ -22,6 +22,10 @@ const configuration: webpack.Configuration = {
 
   target: 'electron-main',
 
+  externals: {
+    'node-win-pcap': 'commonjs2 node-win-pcap',
+  },
+
   entry: {
     main: path.join(webpackPaths.srcMainPath, 'main.ts'),
     preload: path.join(webpackPaths.srcMainPath, 'preload.ts'),
