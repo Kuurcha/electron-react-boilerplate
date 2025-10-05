@@ -23,8 +23,10 @@
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
-      "outputCapture": "std"
+      "outputCapture": "std",
+      "preLaunchTask": "npm: prestart"
     },
+
     {
       "name": "Attach to Electron Main",
       "type": "node",
@@ -37,9 +39,5 @@
       "name": "Electron: All",
       "configurations": ["Electron: Main", "Electron: Renderer"]
     },
-    {
-      "name": "Electron: All",
-      "configurations": ["Electron: Main", "Electron: Renderer"]
-    }
   ]
 }

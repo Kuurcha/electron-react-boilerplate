@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "type": "npm",
+      "script": "prestart",
+      "label": "npm: prestart",
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
+      "script": "package",
+      "label": "npm: package",
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
+      "script": "start",
+      "label": "npm: start (renderer + dev)",
+      "problemMatcher": []
+    },
+    {
+      "type": "npm",
+      "script": "build",
+      "label": "npm: build (prod webpack main+renderer)",
+      "problemMatcher": []
+    }
+  ]
+}
