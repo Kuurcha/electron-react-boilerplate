@@ -15,7 +15,7 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { NodeWinPcap } from 'node-win-pcap';
-
+import fs from "fs";
 import os from "os";
 
 
@@ -128,67 +128,104 @@ app.on('window-all-closed', () => {
   }
 });
 
+
+/**
+ * Logs messages with a timestamp and SNIFFER INFO tag.
+ */
+function snifferLog(...messages: any[]) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] SNIFFER INFO:`, ...messages);
+}
+
+
+function startPacketSniffer(ipAddress: string) {
+  const logPath = path.join(process.cwd(), "sniffer_log.txt");
+
+  // helper to append lines to file
+  const writeLog = (...messages: any[]) => {
+    const line = messages.map(String).join(" ") + "\n";
+    fs.appendFileSync(logPath, line);
+  };
+
+  try {
+    const pcap = new NodeWinPcap(ipAddress, { /* options */ });
+    writeLog("APP IS READY");
+
+    pcap.on("packet", (packet) => {
+      writeLog("--- New Packet ---");
+      writeLog("Packet Length:", packet.length);
+
+      const ipHeader = packet.ipHeader;
+      if (ipHeader) {
+        writeLog(`Source IP: ${ipHeader.sourceIP}`);
+        writeLog(`Destination IP: ${ipHeader.destIP}`);
+        writeLog(`Protocol: ${ipHeader.protocol}`);
+
+        if (ipHeader.protocol === NodeWinPcap.Protocol.TCP) {
+          writeLog("  (TCP Protocol)");
+        } else if (ipHeader.protocol === NodeWinPcap.Protocol.UDP) {
+          writeLog("  (UDP Protocol)");
+        }
+
+        writeLog(`Source Port: ${ipHeader.sourcePort}`);
+        writeLog(`Destination Port: ${ipHeader.destPort}`);
+      }
+      writeLog(""); // blank line for readability
+    });
+
+    pcap.on("error", (error) => {
+      writeLog("An error occurred:", error);
+    });
+
+    pcap.start();
+    writeLog(`Packet sniffing started on ${pcap.ipAddress}...`);
+
+    setTimeout(() => {
+      pcap.stop();
+      writeLog("Packet sniffing stopped.");
+    }, 40000);
+  } catch (e: any) {
+    writeLog(`Failed to start sniffing: ${e.message}`);
+  }
+}
+
+function printNetworkInterfacesPretty() {
+  const interfaces = os.networkInterfaces();
+
+  console.log('\n==============================');
+  console.log('🌐  Available Network Interfaces');
+  console.log('==============================');
+
+  for (const [name, addrs] of Object.entries(interfaces)) {
+    console.log(`\n Interface: ${name}`);
+    console.log('--------------------------------');
+
+    if (!addrs || addrs.length === 0) {
+      console.log('  (No addresses found)');
+      continue;
+    }
+
+    for (const addr of addrs) {
+      console.log(`    Address:  ${addr.address}`);
+      console.log(`    Family:   ${addr.family}`);
+      console.log(`    MAC:      ${addr.mac}`);
+      console.log(`    Internal: ${addr.internal ? 'Yes' : 'No'}`);
+      console.log('');
+    }
+  }
+
+  console.log('==============================\n');
+}
+
 app
   .whenReady()
   .then(() => {
     createWindow();
-            const pcap = new NodeWinPcap('192.168.1.57', { /* options */ });
-            // const interfacese: any = os.networkInterfaces();
-            // console.log(os.networkInterfaces());
-            // console.log("test");
-          //   console.log("APP IS READY");
-          //   pcap.on('packet', (packet) => {
-          //     console.log('--- New Packet ---');
-          //     console.log('Packet Length:', packet.length);
-
-          //     // Print IP header information
-          //     const ipHeader = packet.ipHeader;
-          //     if (ipHeader) {
-          //       console.log(`Source IP: ${ipHeader.sourceIP}`);
-          //       console.log(`Destination IP: ${ipHeader.destIP}`);
-          //       console.log(`Protocol: ${ipHeader.protocol}`);
-          //       if (ipHeader.protocol === NodeWinPcap.Protocol.TCP) {
-          //         console.log('  (TCP Protocol)');
-          //       } else if (ipHeader.protocol === NodeWinPcap.Protocol.UDP) {
-          //         console.log('  (UDP Protocol)');
-          //       }
-          //       console.log(`Source Port: ${ipHeader.sourcePort}`);
-          //       console.log(`Destination Port: ${ipHeader.destPort}`);
-          //     }
-
-          //     // Full packet data (Buffer)
-          //     // console.log('Packet Data:', packet.data);
-          //   });
-
-          // // Set up 'error' event listener
-          // pcap.on('error', (error) => {
-          //   console.error('An error occurred:', error);
-          // });
-
-          // try {
-          //   // Start packet capture (without filters)
-          //   pcap.start('1.2.3.4', '5.6.7.8');
-          //   console.log(`Packet sniffing started on ${pcap.ipAddress}...`);
-
-          //   // Start capture with specific IP address filters
-          //   // pcap.start('1.2.3.4', '5.6.7.8'); // sourceIP: 1.2.3.4, destIP: 5.6.7.8
-          //   // console.log('Packet sniffing started with IP filters...');
-
-          // } catch (e: any) {
-          //   console.error(`Failed to start sniffing: ${e.message}`);
-          // }
-
-          // // Stop capture after 10 seconds
-          // setTimeout(() => {
-          //   pcap.stop();
-          //   console.log('Packet sniffing stopped.');
-          // }, 10000);
+    printNetworkInterfacesPretty();
+    // startPacketSniffer('192.168.1.57');
 
     app.on('activate', () => {
 
-
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
       if (mainWindow === null) createWindow();
     });
   })
