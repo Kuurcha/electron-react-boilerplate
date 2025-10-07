@@ -10,6 +10,7 @@ import ReactRefreshWebpackPlugin from '@pmmmwh/react-refresh-webpack-plugin';
 import baseConfig from './webpack.config.base';
 import webpackPaths from './webpack.paths';
 import checkNodeEnv from '../scripts/check-node-env';
+import MiniCssExtractPlugin from 'mini-css-extract-plugin';
 
 // When an ESLint server is running, we can't set the NODE_ENV so we'll check if it's
 // at the dev webpack config is not accidentally run in a production environment
@@ -63,7 +64,7 @@ const configuration: webpack.Configuration = {
   module: {
     rules: [
       {
-        test: /\.s?(c|a)ss$/,
+        test: /\.module\.s?(c|a)ss$/,
         use: [
           'style-loader',
           {
@@ -71,18 +72,20 @@ const configuration: webpack.Configuration = {
             options: {
               modules: true,
               sourceMap: true,
-              importLoaders: 1,
+              importLoaders: 2, // note: postcss + sass
             },
           },
+          'postcss-loader',
           'sass-loader',
         ],
         include: /\.module\.s?(c|a)ss$/,
       },
       {
-        test: /\.s?css$/,
-        use: ['style-loader', 'css-loader', 'sass-loader'],
+        test: /\.s?(c|a)ss$/,
         exclude: /\.module\.s?(c|a)ss$/,
+        use: ['style-loader', 'css-loader', 'postcss-loader', 'sass-loader'],
       },
+
       // Fonts
       {
         test: /\.(woff|woff2|eot|ttf|otf)$/i,

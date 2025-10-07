@@ -51,6 +51,7 @@ const configuration: webpack.Configuration = {
             },
           },
           'sass-loader',
+          'postcss-loader',
         ],
         include: /\.module\.s?(c|a)ss$/,
       },

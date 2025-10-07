@@ -15,9 +15,8 @@ import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
 import { NodeWinPcap } from 'node-win-pcap';
-import fs from "fs";
-import os from "os";
-
+import fs from 'fs';
+import os from 'os';
 
 class AppUpdater {
   constructor() {
@@ -128,7 +127,6 @@ app.on('window-all-closed', () => {
   }
 });
 
-
 /**
  * Logs messages with a timestamp and SNIFFER INFO tag.
  */
@@ -137,23 +135,24 @@ function snifferLog(...messages: any[]) {
   console.log(`[${timestamp}] SNIFFER INFO:`, ...messages);
 }
 
-
 function startPacketSniffer(ipAddress: string) {
-  const logPath = path.join(process.cwd(), "sniffer_log.txt");
+  const logPath = path.join(process.cwd(), 'sniffer_log.txt');
 
   // helper to append lines to file
   const writeLog = (...messages: any[]) => {
-    const line = messages.map(String).join(" ") + "\n";
+    const line = messages.map(String).join(' ') + '\n';
     fs.appendFileSync(logPath, line);
   };
 
   try {
-    const pcap = new NodeWinPcap(ipAddress, { /* options */ });
-    writeLog("APP IS READY");
+    const pcap = new NodeWinPcap(ipAddress, {
+      /* options */
+    });
+    writeLog('APP IS READY');
 
-    pcap.on("packet", (packet) => {
-      writeLog("--- New Packet ---");
-      writeLog("Packet Length:", packet.length);
+    pcap.on('packet', (packet) => {
+      writeLog('--- New Packet ---');
+      writeLog('Packet Length:', packet.length);
 
       const ipHeader = packet.ipHeader;
       if (ipHeader) {
@@ -162,19 +161,19 @@ function startPacketSniffer(ipAddress: string) {
         writeLog(`Protocol: ${ipHeader.protocol}`);
 
         if (ipHeader.protocol === NodeWinPcap.Protocol.TCP) {
-          writeLog("  (TCP Protocol)");
+          writeLog('  (TCP Protocol)');
         } else if (ipHeader.protocol === NodeWinPcap.Protocol.UDP) {
-          writeLog("  (UDP Protocol)");
+          writeLog('  (UDP Protocol)');
         }
 
         writeLog(`Source Port: ${ipHeader.sourcePort}`);
         writeLog(`Destination Port: ${ipHeader.destPort}`);
       }
-      writeLog(""); // blank line for readability
+      writeLog(''); // blank line for readability
     });
 
-    pcap.on("error", (error) => {
-      writeLog("An error occurred:", error);
+    pcap.on('error', (error) => {
+      writeLog('An error occurred:', error);
     });
 
     pcap.start();
@@ -182,7 +181,7 @@ function startPacketSniffer(ipAddress: string) {
 
     setTimeout(() => {
       pcap.stop();
-      writeLog("Packet sniffing stopped.");
+      writeLog('Packet sniffing stopped.');
     }, 40000);
   } catch (e: any) {
     writeLog(`Failed to start sniffing: ${e.message}`);
@@ -222,12 +221,10 @@ app
   .then(() => {
     createWindow();
     printNetworkInterfacesPretty();
-    // startPacketSniffer('192.168.1.57');
+    startPacketSniffer('192.168.1.57');
 
     app.on('activate', () => {
-
       if (mainWindow === null) createWindow();
     });
   })
-.catch(console.log);
-
+  .catch(console.log);
