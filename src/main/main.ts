@@ -17,6 +17,9 @@ import { resolveHtmlPath } from './util';
 import { NodeWinPcap } from 'node-win-pcap';
 import fs from 'fs';
 import os from 'os';
+import { getNetworkInterfaces } from './networkCapturer/functions';
+import { CaptureSettings } from '../bus/types';
+import { NetworkInterfaceInfo } from './networkCapturer/type';
 
 class AppUpdater {
   constructor() {
@@ -27,6 +30,7 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let activePcap: NodeWinPcap | null = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
@@ -135,94 +139,125 @@ function snifferLog(...messages: any[]) {
   console.log(`[${timestamp}] SNIFFER INFO:`, ...messages);
 }
 
-function startPacketSniffer(ipAddress: string) {
+function stopPacketSniffer() {
   const logPath = path.join(process.cwd(), 'sniffer_log.txt');
-
-  // helper to append lines to file
   const writeLog = (...messages: any[]) => {
     const line = messages.map(String).join(' ') + '\n';
     fs.appendFileSync(logPath, line);
   };
 
+  if (activePcap) {
+    try {
+      activePcap.stop();
+      writeLog('Packet sniffing manually stopped.');
+    } catch (e: any) {
+      writeLog(`Error while stopping sniffer: ${e.message}`);
+    } finally {
+      activePcap = null;
+    }
+  } else {
+    writeLog('No active sniffer to stop.');
+  }
+}
+
+app.on('before-quit', () => {
+  console.log('App is quitting — stopping sniffer if running...');
+  stopPacketSniffer();
+});
+
+/**
+ * Starts a packet sniffer and logs only the moments of packet arrivals.
+ * @param ipAddress - IP of the interface to capture on
+ * @param durationSecStr - Duration in seconds (as string)
+ */
+function startPacketSniffer(ipAddress: string, durationSecStr: string) {
+  const durationSec = parseInt(durationSecStr, 10);
+
+  if (Number.isNaN(durationSec) || durationSec <= 0) {
+    console.error('Invalid duration:', durationSecStr);
+    return;
+  }
+
+  const logPath = path.join(process.cwd(), 'sniffer_log.txt');
+
+  // Clear existing log
+  fs.writeFileSync(logPath, '');
+
+  const startTime = process.hrtime.bigint(); // high-res start time
+
+  const writeLog = (timeSec: number) => {
+    const line = timeSec.toFixed(10).replace('.', ',') + '\n';
+    fs.appendFileSync(logPath, line);
+  };
+
   try {
-    const pcap = new NodeWinPcap(ipAddress, {
-      /* options */
-    });
-    writeLog('APP IS READY');
+    // Stop any previous capture
+    if (activePcap) {
+      activePcap.stop();
+      activePcap.removeAllListeners();
+      activePcap = null;
+    }
 
-    pcap.on('packet', (packet) => {
-      writeLog('--- New Packet ---');
-      writeLog('Packet Length:', packet.length);
+    const pcap = new NodeWinPcap(ipAddress);
+    activePcap = pcap;
 
-      const ipHeader = packet.ipHeader;
-      if (ipHeader) {
-        writeLog(`Source IP: ${ipHeader.sourceIP}`);
-        writeLog(`Destination IP: ${ipHeader.destIP}`);
-        writeLog(`Protocol: ${ipHeader.protocol}`);
-
-        if (ipHeader.protocol === NodeWinPcap.Protocol.TCP) {
-          writeLog('  (TCP Protocol)');
-        } else if (ipHeader.protocol === NodeWinPcap.Protocol.UDP) {
-          writeLog('  (UDP Protocol)');
-        }
-
-        writeLog(`Source Port: ${ipHeader.sourcePort}`);
-        writeLog(`Destination Port: ${ipHeader.destPort}`);
-      }
-      writeLog(''); // blank line for readability
+    pcap.on('packet', () => {
+      const now = process.hrtime.bigint();
+      const deltaNs = Number(now - startTime); // nanoseconds
+      const deltaSec = deltaNs / 1_000_000_000; // convert to seconds
+      writeLog(deltaSec);
     });
 
-    pcap.on('error', (error) => {
-      writeLog('An error occurred:', error);
+    pcap.on('error', (err) => {
+      console.error('Sniffer error:', err);
     });
 
     pcap.start();
-    writeLog(`Packet sniffing started on ${pcap.ipAddress}...`);
+    console.log(
+      `Packet sniffing started on ${ipAddress} for ${durationSec} seconds`,
+    );
 
+    // Stop after duration
     setTimeout(() => {
-      pcap.stop();
-      writeLog('Packet sniffing stopped.');
-    }, 40000);
+      if (activePcap) {
+        activePcap.stop();
+        activePcap.removeAllListeners();
+        activePcap = null;
+        console.log('Packet sniffing stopped.');
+      }
+    }, durationSec * 1000);
   } catch (e: any) {
-    writeLog(`Failed to start sniffing: ${e.message}`);
+    console.error('Failed to start sniffing:', e.message);
   }
 }
 
-function printNetworkInterfacesPretty() {
-  const interfaces = os.networkInterfaces();
+ipcMain.handle('getNetworkInterfaces', async () => {
+  return getNetworkInterfaces();
+});
 
-  console.log('\n==============================');
-  console.log('🌐  Available Network Interfaces');
-  console.log('==============================');
+ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
+  stopPacketSniffer();
+  const currentInterfaces: NetworkInterfaceInfo[] = getNetworkInterfaces();
+  const currentInterface = currentInterfaces.find(
+    (networkInterface) => networkInterface.name == settings.interfaceName,
+  );
+  const currentInterfaceIp = currentInterface?.addresses[0].address ?? '';
 
-  for (const [name, addrs] of Object.entries(interfaces)) {
-    console.log(`\n Interface: ${name}`);
-    console.log('--------------------------------');
+  console.log(`Starting capture on ${currentInterfaceIp}`);
+  startPacketSniffer(currentInterfaceIp, settings.duration);
+});
 
-    if (!addrs || addrs.length === 0) {
-      console.log('  (No addresses found)');
-      continue;
-    }
-
-    for (const addr of addrs) {
-      console.log(`    Address:  ${addr.address}`);
-      console.log(`    Family:   ${addr.family}`);
-      console.log(`    MAC:      ${addr.mac}`);
-      console.log(`    Internal: ${addr.internal ? 'Yes' : 'No'}`);
-      console.log('');
-    }
-  }
-
-  console.log('==============================\n');
-}
+ipcMain.on('stopCapture', () => {
+  console.log('Stopping capture...');
+  stopPacketSniffer();
+});
 
 app
   .whenReady()
   .then(() => {
     createWindow();
     printNetworkInterfacesPretty();
-    startPacketSniffer('192.168.1.57');
-
+    startPacketSniffer('192.168.1.57', '10');
     app.on('activate', () => {
       if (mainWindow === null) createWindow();
     });

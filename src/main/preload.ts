@@ -1,8 +1,13 @@
 // Disable no-unused-vars, broken for spread args
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-
-export type Channels = 'ipc-example';
+import { NetworkInterfaceInfo } from './networkCapturer/type';
+import { CaptureSettings } from '../bus/types';
+export type Channels =
+  | 'ipc-example'
+  | 'getNetworkInterfaces'
+  | 'startCapture'
+  | 'stopCapture';
 
 const electronHandler = {
   ipcRenderer: {
@@ -22,8 +27,21 @@ const electronHandler = {
       ipcRenderer.once(channel, (_event, ...args) => func(...args));
     },
   },
+  getNetworkInterfaces: async (): Promise<NetworkInterfaceInfo[]> => {
+    return ipcRenderer.invoke('getNetworkInterfaces');
+  },
+
+  startCapture: (captureSettings: CaptureSettings) =>
+    ipcRenderer.send('startCapture', captureSettings),
+
+  stopCapture: () => ipcRenderer.send('stopCapture'),
 };
 
-contextBridge.exposeInMainWorld('electron', electronHandler);
+contextBridge.exposeInMainWorld('electron', {
+  ipcRenderer: electronHandler.ipcRenderer,
+  getNetworkInterfaces: electronHandler.getNetworkInterfaces,
+  startCapture: electronHandler.startCapture,
+  stopCapture: electronHandler.stopCapture,
+});
 
 export type ElectronHandler = typeof electronHandler;
