@@ -9,6 +9,8 @@ export type Channels =
   | 'startCapture'
   | 'stopCapture';
 
+console.log('✅ Preload loaded, sandbox:', process.sandboxed);
+
 const electronHandler = {
   ipcRenderer: {
     sendMessage(channel: Channels, ...args: unknown[]) {
@@ -35,6 +37,22 @@ const electronHandler = {
     ipcRenderer.send('startCapture', captureSettings),
 
   stopCapture: () => ipcRenderer.send('stopCapture'),
+
+  saveFileDialogue: async (): Promise<string | null> => {
+    return await ipcRenderer.invoke('dialog:save-file');
+  },
+
+  writeFile: async (path: string, content: string) => {
+    return await ipcRenderer.invoke('file:write', path, content);
+  },
+
+  fileExists: async (path: string): Promise<boolean> => {
+    return await ipcRenderer.invoke('file:exists', path);
+  },
+
+  fileGetDefaultPath: async (): Promise<string> => {
+    return await ipcRenderer.invoke('file:getDefaultPath');
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', {
@@ -42,6 +60,10 @@ contextBridge.exposeInMainWorld('electron', {
   getNetworkInterfaces: electronHandler.getNetworkInterfaces,
   startCapture: electronHandler.startCapture,
   stopCapture: electronHandler.stopCapture,
+  saveFileDialogue: electronHandler.saveFileDialogue,
+  writeFile: electronHandler.writeFile,
+  fileExists: electronHandler.fileExists,
+  fileGetDefaultPath: electronHandler.fileGetDefaultPath,
 });
 
 export type ElectronHandler = typeof electronHandler;

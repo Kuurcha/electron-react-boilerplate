@@ -5,6 +5,7 @@ import './App.css';
 import Dropdown from './components/dropdown';
 import { NetworkInterfaceInfo } from '../main/networkCapturer/type';
 import { CaptureParams, CaptureSettings } from '../bus/types';
+import CustomInput from './components/input';
 
 function Hello() {
   const [interfaces, setInterfaces] = useState<NetworkInterfaceInfo[]>([]);
@@ -14,7 +15,13 @@ function Hello() {
     maxPackets: '999',
     duration: '10',
   });
+  const [pathToFile, setPathToFile] = useState<string>('');
 
+  const handleSavePath = async () => {
+    const filePath = await window.electron.saveFileDialogue();
+    if (!filePath) return;
+    console.log(`user chose: ${filePath}`);
+  };
   // eslint-disable-next-line no-undef
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -62,6 +69,13 @@ function Hello() {
   };
 
   useEffect(() => {
+    async function fetchDefaultPath() {
+      const defaultPath = await window.electron.fileGetDefaultPath();
+      setPathToFile(defaultPath);
+    }
+
+    fetchDefaultPath();
+
     window.electron
       .getNetworkInterfaces()
       .then(setInterfaces)
@@ -83,51 +97,47 @@ function Hello() {
       <div className="relative max-w-sm">
         <div className="flex justify-center">
           <div className="flex flex-col space-y-4 p-4 max-w-3xs">
+            <button
+              onClick={handleSavePath}
+              type="button"
+              className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+            ></button>
+
             <div className="flex justify-center items-center ">
               <Dropdown
                 label={
-                  selectedInterface ? selectedInterface.name : 'Select Network'
+                  selectedInterface
+                    ? selectedInterface.name
+                    : 'Выберите интерфейс'
                 }
                 items={items}
               />
             </div>
-
-            <input
-              // eslint-disable-next-line react/no-unknown-property
-              id="default-datepicker"
-              type="number"
-              name="maxPackets"
-              min="1"
-              value={captureParams.maxPackets}
-              onChange={handleInputChange}
-              onInput={(e: any) => {
-                if (e.target.value < 1) e.target.value = '1';
-              }}
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg
-             focus:ring-blue-500 focus:border-blue-500
-             ps-5 p-1.5 w-full
-             dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400
-             dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              placeholder="Максимум пакетов"
-            />
-            <input
-              // eslint-disable-next-line react/no-unknown-property
-              id="default-datepicker"
-              name="duration"
-              type="number"
-              min="1"
-              value={captureParams.duration}
-              onChange={handleInputChange}
-              onInput={(e: any) => {
-                if (e.target.value < 1) e.target.value = '1';
-              }}
-              className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg
-             focus:ring-blue-500 focus:border-blue-500
-             ps-5 p-1.5 w-full
-             dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400
-             dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-              placeholder="Длительность (сек)"
-            />
+            <div className="flex flex-row space-x-4 p-4 max-w-3xs">
+              {' '}
+              <CustomInput
+                label="Максимум пакетов"
+                name="maxPackets"
+                value={captureParams.maxPackets}
+                onChange={handleInputChange}
+                onInput={(e: any) => {
+                  if (e.target.value < 1) e.target.value = '1';
+                }}
+                min={1}
+                placeholder="Максимум пакетов"
+              />
+              <CustomInput
+                label="Длительность (сек)"
+                name="duration"
+                value={captureParams.duration}
+                onChange={handleInputChange}
+                onInput={(e: any) => {
+                  if (e.target.value < 1) e.target.value = '1';
+                }}
+                min={1}
+                placeholder="Длительность (сек)"
+              />
+            </div>
           </div>
         </div>
       </div>

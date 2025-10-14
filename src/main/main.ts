@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -20,6 +20,7 @@ import os from 'os';
 import { getNetworkInterfaces } from './networkCapturer/functions';
 import { CaptureSettings } from '../bus/types';
 import { NetworkInterfaceInfo } from './networkCapturer/type';
+import { getAppRootFilePath } from './helpers/fileHelper';
 
 class AppUpdater {
   constructor() {
@@ -85,6 +86,9 @@ const createWindow = async () => {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')
         : path.join(__dirname, '../../.erb/dll/preload.js'),
+      // contextIsolation: true,
+      // nodeIntegration: false,
+      // sandbox: false,
     },
   });
 
@@ -149,14 +153,14 @@ function stopPacketSniffer() {
   if (activePcap) {
     try {
       activePcap.stop();
-      writeLog('Packet sniffing manually stopped.');
+      console.log('Packet sniffing manually stopped.');
     } catch (e: any) {
-      writeLog(`Error while stopping sniffer: ${e.message}`);
+      console.log(`Error while stopping sniffer: ${e.message}`);
     } finally {
       activePcap = null;
     }
   } else {
-    writeLog('No active sniffer to stop.');
+    console.log('No active sniffer to stop.');
   }
 }
 
@@ -252,12 +256,38 @@ ipcMain.on('stopCapture', () => {
   stopPacketSniffer();
 });
 
+ipcMain.handle('dialog:save-file', async (_) => {
+  console.log('saving file file');
+  const defaultPath = getAppRootFilePath();
+  const { filePath, canceled } = await dialog.showSaveDialog({
+    title: 'Save As',
+    defaultPath,
+    filters: [{ name: 'Text Files', extensions: ['txt'] }],
+  });
+
+  if (canceled || !filePath) return null;
+  return filePath;
+});
+
+ipcMain.handle('file:write', async (_, filePath, content) => {
+  console.log('writing file');
+  filePath = filePath == '' ? getAppRootFilePath() : filePath;
+  fs.writeFileSync(filePath, content, 'utf-8');
+  return true;
+});
+
+ipcMain.handle('file:exists', async (_, filePath: string): Promise<boolean> => {
+  return fs.existsSync(filePath);
+});
+
+ipcMain.handle('file:getDefaultPath', () => {
+  return getAppRootFilePath();
+});
+
 app
   .whenReady()
   .then(() => {
     createWindow();
-    printNetworkInterfacesPretty();
-    startPacketSniffer('192.168.1.57', '10');
     app.on('activate', () => {
       if (mainWindow === null) createWindow();
     });
