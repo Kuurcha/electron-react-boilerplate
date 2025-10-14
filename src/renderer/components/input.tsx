@@ -24,6 +24,7 @@ function CustomInput({
       <label htmlFor={name} className="">
         {label}
       </label>
+      <span className="icon-[mdi-light--home]"></span>
       <input
         id={name}
         type="number"

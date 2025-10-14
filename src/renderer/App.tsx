@@ -1,6 +1,8 @@
 import { MemoryRouter as Router, Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { FolderIcon } from '@heroicons/react/24/solid';
 import icon from '../../assets/icon.svg';
+
 import './App.css';
 import Dropdown from './components/dropdown';
 import { NetworkInterfaceInfo } from '../main/networkCapturer/type';
@@ -20,7 +22,7 @@ function Hello() {
   const handleSavePath = async () => {
     const filePath = await window.electron.saveFileDialogue();
     if (!filePath) return;
-    console.log(`user chose: ${filePath}`);
+    setPathToFile(filePath);
   };
   // eslint-disable-next-line no-undef
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,6 +59,7 @@ function Hello() {
       maxPackets: maxPacketsNum.toString(),
       duration: durationNum.toString(),
       interfaceName: selectedInterface.name,
+      filePath: pathToFile,
     };
 
     window.electron.startCapture(captureSettings);
@@ -97,11 +100,22 @@ function Hello() {
       <div className="relative max-w-sm">
         <div className="flex justify-center">
           <div className="flex flex-col space-y-4 p-4 max-w-3xs">
-            <button
-              onClick={handleSavePath}
-              type="button"
-              className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-            ></button>
+            <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={handleSavePath}
+                className=" bg-gray-300 p-1 hover:bg-gray-400 rounded"
+              >
+                <FolderIcon className="h-6 w-6 text-gray-600" />
+              </button>
+              <input
+                type="text"
+                readOnly
+                value={pathToFile}
+                className="flex-1 border rounded-lg px-2 py-1 text-sm
+             text-gray-900 text-gray-800 bg-gray-300"
+              />
+            </div>
 
             <div className="flex justify-center items-center ">
               <Dropdown

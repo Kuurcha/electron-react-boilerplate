@@ -5,4 +5,5 @@ export interface CaptureParams {
 
 export interface CaptureSettings extends CaptureParams {
   interfaceName: string;
+  filePath: string;
 }

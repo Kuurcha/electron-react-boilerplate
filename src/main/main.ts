@@ -174,7 +174,11 @@ app.on('before-quit', () => {
  * @param ipAddress - IP of the interface to capture on
  * @param durationSecStr - Duration in seconds (as string)
  */
-function startPacketSniffer(ipAddress: string, durationSecStr: string) {
+function startPacketSniffer(
+  ipAddress: string,
+  durationSecStr: string,
+  logPath: string,
+) {
   const durationSec = parseInt(durationSecStr, 10);
 
   if (Number.isNaN(durationSec) || durationSec <= 0) {
@@ -182,7 +186,7 @@ function startPacketSniffer(ipAddress: string, durationSecStr: string) {
     return;
   }
 
-  const logPath = path.join(process.cwd(), 'sniffer_log.txt');
+  logPath = logPath ?? path.join(process.cwd(), 'sniffer_log.txt');
 
   // Clear existing log
   fs.writeFileSync(logPath, '');
@@ -241,6 +245,7 @@ ipcMain.handle('getNetworkInterfaces', async () => {
 
 ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
   stopPacketSniffer();
+
   const currentInterfaces: NetworkInterfaceInfo[] = getNetworkInterfaces();
   const currentInterface = currentInterfaces.find(
     (networkInterface) => networkInterface.name == settings.interfaceName,
@@ -248,7 +253,7 @@ ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
   const currentInterfaceIp = currentInterface?.addresses[0].address ?? '';
 
   console.log(`Starting capture on ${currentInterfaceIp}`);
-  startPacketSniffer(currentInterfaceIp, settings.duration);
+  startPacketSniffer(currentInterfaceIp, settings.duration, settings.filePath);
 });
 
 ipcMain.on('stopCapture', () => {
