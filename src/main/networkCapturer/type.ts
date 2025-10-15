@@ -10,4 +10,10 @@ export interface NetworkInterfaceInfo {
   addresses: NetworkAddress[];
 }
 
+export type CaptureState = 'running' | 'stopped';
 
+export interface CaptureStatus {
+  state: CaptureState;
+  message?: string;
+  filePath?: string;
+}

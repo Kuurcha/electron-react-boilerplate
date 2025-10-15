@@ -5,11 +5,18 @@ import icon from '../../assets/icon.svg';
 
 import './App.css';
 import Dropdown from './components/dropdown';
-import { NetworkInterfaceInfo } from '../main/networkCapturer/type';
+import {
+  CaptureStatus,
+  NetworkInterfaceInfo,
+} from '../main/networkCapturer/type';
 import { CaptureParams, CaptureSettings } from '../bus/types';
 import CustomInput from './components/input';
 
 function Hello() {
+  const [captureStatus, setCaptureStatus] = useState<CaptureStatus>({
+    state: 'stopped',
+  });
+
   const [interfaces, setInterfaces] = useState<NetworkInterfaceInfo[]>([]);
   const [selectedInterface, setSelectedInterface] =
     useState<NetworkInterfaceInfo | null>(null);
@@ -38,7 +45,7 @@ function Hello() {
 
   const handleStartCapture = () => {
     if (!selectedInterface) {
-      alert('Please select a network interface first!');
+      alert('Пожалуйста, сначала выберете интерфейс!');
       return;
     }
 
@@ -46,12 +53,12 @@ function Hello() {
     const durationNum = parseInt(captureParams.duration, 10);
 
     if (Number.isNaN(durationNum) || durationNum <= 0) {
-      alert('Duration must be a positive number');
+      alert('Длительность должна быть позитивным числом!');
       return;
     }
 
     if (Number.isNaN(maxPacketsNum) || maxPacketsNum <= 0) {
-      alert('Max packets must be a positive number');
+      alert('Максимальное кол-во пакетов должно быть позитивным числом');
       return;
     }
 
@@ -83,6 +90,12 @@ function Hello() {
       .getNetworkInterfaces()
       .then(setInterfaces)
       .catch(() => {});
+
+    window.electron.onCaptureStatus((status: CaptureStatus) => {
+      alert(status.message);
+      console.log(`status changed ${status.message}`);
+      setCaptureStatus(status);
+    });
   }, []);
 
   const items = interfaces.map((iface) => ({
@@ -155,23 +168,30 @@ function Hello() {
           </div>
         </div>
       </div>
+      <div className="flex flex-col ">
+        <div className="Hello">
+          <button
+            onClick={handleStartCapture}
+            type="button"
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+          >
+            Начать захват
+          </button>
 
-      <div className="Hello">
-        <button
-          onClick={handleStartCapture}
-          type="button"
-          className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-        >
-          Начать захват
-        </button>
-
-        <button
-          onClick={handleStopCapture}
-          type="button"
-          className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
-        >
-          Остановить захват
-        </button>
+          <button
+            onClick={handleStopCapture}
+            type="button"
+            className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
+          >
+            Остановить захват
+          </button>
+        </div>
+        <div className="text-center mt-2">
+          <p>
+            Текущий статус:{' '}
+            {captureStatus.state === 'stopped' ? 'остановлен' : 'в процессе'}
+          </p>
+        </div>{' '}
       </div>
     </div>
   );

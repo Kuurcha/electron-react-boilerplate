@@ -19,7 +19,7 @@ import fs from 'fs';
 import os from 'os';
 import { getNetworkInterfaces } from './networkCapturer/functions';
 import { CaptureSettings } from '../bus/types';
-import { NetworkInterfaceInfo } from './networkCapturer/type';
+import { CaptureStatus, NetworkInterfaceInfo } from './networkCapturer/type';
 import { getAppRootFilePath } from './helpers/fileHelper';
 
 class AppUpdater {
@@ -169,6 +169,28 @@ app.on('before-quit', () => {
   stopPacketSniffer();
 });
 
+function sendCaptureStatus(status: CaptureStatus) {
+  if (mainWindow) {
+    mainWindow.webContents.send('capture-status', status);
+  }
+}
+
+// TO DO: Убрать ANY
+function stopPacketCapture(activePcapRef: any, logPathRef: any) {
+  if (activePcapRef) {
+    activePcapRef.stop();
+    activePcapRef.removeAllListeners();
+    activePcapRef = null;
+    console.log('Packet sniffing stopped.');
+    sendCaptureStatus({
+      state: 'stopped',
+      message:
+        'Захват остановлен ввиду истечения длительности захвата или достижения лимита пакетов',
+      filePath: logPathRef,
+    });
+  }
+}
+
 /**
  * Starts a packet sniffer and logs only the moments of packet arrivals.
  * @param ipAddress - IP of the interface to capture on
@@ -177,9 +199,12 @@ app.on('before-quit', () => {
 function startPacketSniffer(
   ipAddress: string,
   durationSecStr: string,
+  maxPackets: string,
   logPath: string,
 ) {
   const durationSec = parseInt(durationSecStr, 10);
+  const maxPacketsInt = parseInt(maxPackets);
+  let currentPackets = 0;
 
   if (Number.isNaN(durationSec) || durationSec <= 0) {
     console.error('Invalid duration:', durationSecStr);
@@ -206,10 +231,28 @@ function startPacketSniffer(
       activePcap = null;
     }
 
+    sendCaptureStatus({
+      state: 'running',
+      message: 'Захват начен',
+      filePath: logPath,
+    });
+
     const pcap = new NodeWinPcap(ipAddress);
     activePcap = pcap;
 
+    // Stop after duration
+    const timeoutId = setTimeout(() => {
+      stopPacketCapture(activePcap, logPath);
+    }, durationSec * 1000);
+
     pcap.on('packet', () => {
+      currentPackets++;
+
+      console.log(currentPackets);
+      if (currentPackets >= maxPacketsInt) {
+        stopPacketCapture(activePcap, logPath);
+      }
+
       const now = process.hrtime.bigint();
       const deltaNs = Number(now - startTime); // nanoseconds
       const deltaSec = deltaNs / 1_000_000_000; // convert to seconds
@@ -224,16 +267,6 @@ function startPacketSniffer(
     console.log(
       `Packet sniffing started on ${ipAddress} for ${durationSec} seconds`,
     );
-
-    // Stop after duration
-    setTimeout(() => {
-      if (activePcap) {
-        activePcap.stop();
-        activePcap.removeAllListeners();
-        activePcap = null;
-        console.log('Packet sniffing stopped.');
-      }
-    }, durationSec * 1000);
   } catch (e: any) {
     console.error('Failed to start sniffing:', e.message);
   }
@@ -253,11 +286,22 @@ ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
   const currentInterfaceIp = currentInterface?.addresses[0].address ?? '';
 
   console.log(`Starting capture on ${currentInterfaceIp}`);
-  startPacketSniffer(currentInterfaceIp, settings.duration, settings.filePath);
+
+  startPacketSniffer(
+    currentInterfaceIp,
+    settings.duration,
+    settings.maxPackets,
+    settings.filePath,
+  );
 });
 
 ipcMain.on('stopCapture', () => {
   console.log('Stopping capture...');
+  sendCaptureStatus({
+    state: 'stopped',
+    message: `Захват остановлен вручную`,
+    filePath: '',
+  });
   stopPacketSniffer();
 });
 

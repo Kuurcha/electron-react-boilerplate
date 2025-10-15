@@ -1,7 +1,7 @@
 // Disable no-unused-vars, broken for spread args
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { NetworkInterfaceInfo } from './networkCapturer/type';
+import { CaptureStatus, NetworkInterfaceInfo } from './networkCapturer/type';
 import { CaptureSettings } from '../bus/types';
 export type Channels =
   | 'ipc-example'
@@ -46,6 +46,12 @@ const electronHandler = {
     return await ipcRenderer.invoke('file:write', path, content);
   },
 
+  onCaptureStatus: (callback: (status: CaptureStatus) => void) => {
+    ipcRenderer.on('capture-status', (_event, status: CaptureStatus) => {
+      callback(status);
+    });
+  },
+
   fileExists: async (path: string): Promise<boolean> => {
     return await ipcRenderer.invoke('file:exists', path);
   },
@@ -64,6 +70,7 @@ contextBridge.exposeInMainWorld('electron', {
   writeFile: electronHandler.writeFile,
   fileExists: electronHandler.fileExists,
   fileGetDefaultPath: electronHandler.fileGetDefaultPath,
+  onCaptureStatus: electronHandler.onCaptureStatus,
 });
 
 export type ElectronHandler = typeof electronHandler;
