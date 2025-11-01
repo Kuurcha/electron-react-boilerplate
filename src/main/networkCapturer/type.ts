@@ -17,3 +17,9 @@ export interface CaptureStatus {
   message?: string;
   filePath?: string;
 }
+
+export interface PoissonParams {
+  lambda: number;
+  mu: number;
+  totalTime: number;
+}

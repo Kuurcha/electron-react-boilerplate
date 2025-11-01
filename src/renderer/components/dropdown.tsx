@@ -55,7 +55,7 @@ function Dropdown({ label, items }: DropdownProps) {
           rounded-lg shadow-sm dark:bg-gray-700 "
         >
           <ul className="py-2 text-sm text-gray-700 dark:text-gray-200">
-            {items.map((item, idx) => (
+            {items.map((item) => (
               <li key={item.id}>
                 <button
                   type="button"

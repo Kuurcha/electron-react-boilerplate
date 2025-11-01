@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { FolderIcon } from '@heroicons/react/24/solid';
 import icon from '../../../assets/icon.svg';
 
-import Dropdown from './../components/dropdown';
+import Dropdown from '../components/dropdown';
+import CustomInput from '../components/input';
 import {
   CaptureStatus,
   NetworkInterfaceInfo,
 } from '../../main/networkCapturer/type';
 import { CaptureParams, CaptureSettings } from '../../bus/types';
-import CustomInput from './../components/input';
 
 export default function Capture() {
   const [captureStatus, setCaptureStatus] = useState<CaptureStatus>({
@@ -146,9 +146,6 @@ export default function Capture() {
                 name="maxPackets"
                 value={captureParams.maxPackets}
                 onChange={handleInputChange}
-                onInput={(e: any) => {
-                  if (e.target.value < 1) e.target.value = '1';
-                }}
                 min={1}
                 placeholder="Максимум пакетов"
               />
@@ -157,9 +154,6 @@ export default function Capture() {
                 name="duration"
                 value={captureParams.duration}
                 onChange={handleInputChange}
-                onInput={(e: any) => {
-                  if (e.target.value < 1) e.target.value = '1';
-                }}
                 min={1}
                 placeholder="Длительность (сек)"
               />

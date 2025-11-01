@@ -1,4 +1,4 @@
-type Arrival = {
+export type Arrival = {
   id: number;
   time: number;
   serviceTime: number;

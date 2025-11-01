@@ -1,8 +1,13 @@
 // Disable no-unused-vars, broken for spread args
 /* eslint no-unused-vars: off */
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
-import { CaptureStatus, NetworkInterfaceInfo } from './networkCapturer/type';
+import {
+  CaptureStatus,
+  NetworkInterfaceInfo,
+  PoissonParams,
+} from './networkCapturer/type';
 import { CaptureSettings } from '../bus/types';
+import { Arrival } from './experiment/averageQueue/poisson/poisson';
 export type Channels =
   | 'ipc-example'
   | 'getNetworkInterfaces'
@@ -59,6 +64,10 @@ const electronHandler = {
   fileGetDefaultPath: async (): Promise<string> => {
     return await ipcRenderer.invoke('file:getDefaultPath');
   },
+
+  getPoissonStream: async (params: PoissonParams): Promise<Arrival[]> => {
+    return await ipcRenderer.invoke('getPoissonStream', params);
+  },
 };
 
 contextBridge.exposeInMainWorld('electron', {
@@ -71,6 +80,7 @@ contextBridge.exposeInMainWorld('electron', {
   fileExists: electronHandler.fileExists,
   fileGetDefaultPath: electronHandler.fileGetDefaultPath,
   onCaptureStatus: electronHandler.onCaptureStatus,
+  getPoissonStream: electronHandler.getPoissonStream,
 });
 
 export type ElectronHandler = typeof electronHandler;

@@ -135,8 +135,7 @@ export class Sniffer {
     }
   }
 
-  // TO DO: Убрать ANY
-  stopPacketCapture(activePcapRef: any, logPathRef: any) {
+  stopPacketCapture(activePcapRef: NodeWinPcap | null, logPathRef: string) {
     if (activePcapRef) {
       activePcapRef.stop();
       activePcapRef.removeAllListeners();

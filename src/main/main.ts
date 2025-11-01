@@ -23,6 +23,7 @@ import { getAppRootFilePath } from './helpers/fileHelper';
 import { Sniffer } from './networkCapturer/sniffer';
 import { generatePoissonArrivals } from './experiment/averageQueue/poisson/poisson';
 import NetworkCapturerIpcHandler from './endpoints/networkCapture';
+import AverageQueueExperimentIpcHandler from './endpoints/averageQueueExperiment';
 
 class AppUpdater {
   constructor() {
@@ -48,6 +49,8 @@ const installExtensions = async () => {
 let mainWindow: BrowserWindow | null = null;
 let sniffer: Sniffer | null = null;
 let networkCaptureEndpoints: NetworkCapturerIpcHandler | null = null;
+let averageQueueExperimentIpcHandler: AverageQueueExperimentIpcHandler | null =
+  null;
 
 const createWindow = async () => {
   if (isDebug) {
@@ -108,6 +111,7 @@ const createWindow = async () => {
   new AppUpdater();
   sniffer = new Sniffer(mainWindow);
   networkCaptureEndpoints = new NetworkCapturerIpcHandler(sniffer);
+  averageQueueExperimentIpcHandler = new AverageQueueExperimentIpcHandler();
 };
 
 /**
@@ -143,12 +147,7 @@ app
   .whenReady()
   .then(() => {
     createWindow();
-    const lambda = 2.0;
-    const mu = 1;
-    const totalTime = 10.0;
 
-    const arrivals = generatePoissonArrivals(lambda, mu, totalTime);
-    console.table(arrivals);
     app.on('activate', () => {
       if (mainWindow === null) createWindow();
     });

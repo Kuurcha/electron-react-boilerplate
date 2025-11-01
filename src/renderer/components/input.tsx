@@ -4,8 +4,8 @@ interface CustomInputProps {
   label: string;
   name: string;
   value: string | number;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onInput?: (e: React.FormEvent<HTMLInputElement>) => void;
+  onChange: React.ChangeEventHandler<HTMLInputElement>;
+  onInput?: React.FormEventHandler<HTMLInputElement>;
   min?: number;
   placeholder?: string;
 }
@@ -15,7 +15,7 @@ function CustomInput({
   name,
   value,
   onChange,
-  onInput,
+  onInput = undefined,
   min = 1,
   placeholder,
 }: CustomInputProps) {
@@ -24,7 +24,7 @@ function CustomInput({
       <label htmlFor={name} className="">
         {label}
       </label>
-      <span className="icon-[mdi-light--home]"></span>
+      <span className="icon-[mdi-light--home]" />
       <input
         id={name}
         type="number"
