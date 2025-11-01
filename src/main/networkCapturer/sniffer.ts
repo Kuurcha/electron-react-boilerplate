@@ -39,6 +39,19 @@ export class Sniffer {
       const line = messages.map(String).join(' ') + '\n';
       fs.appendFileSync(logPath, line);
     };
+
+    if (this.activePcap) {
+      try {
+        this.activePcap.stop();
+        console.log('Packet sniffing manually stopped.');
+      } catch (e: any) {
+        console.log(`Error while stopping sniffer: ${e.message}`);
+      } finally {
+        this.activePcap = null;
+      }
+    } else {
+      console.log('No active sniffer to stop.');
+    }
   }
 
   /**

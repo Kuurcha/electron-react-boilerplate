@@ -103,7 +103,7 @@ export default function Capture() {
   }));
 
   return (
-    <div className="h-1/2 w-1/2 self-center my-auto mx-auto">
+    <div className="flex flex-col self-center my-auto mx-auto">
       <div className="Hello">
         <img width="200" alt="icon" src={icon} />
       </div>

@@ -10,17 +10,16 @@ function exponential(meanRate: number): number {
   return -Math.log(1 - u) / meanRate;
 }
 
-
 /**
  * Генерация пуассоновского потока
  * @param lambda — интенсивность потока (среднее число заявок в секунду)
  * @param mu — параметр экспоненциального обслуживания (1 / среднее время обслуживания)
  * @param totalTime — длительность моделирования
  */
-function generatePoissonArrivals(
+export function generatePoissonArrivals(
   lambda: number,
   mu: number,
-  totalTime: number
+  totalTime: number,
 ): Arrival[] {
   const arrivals: Arrival[] = [];
   let currentTime = 0;
@@ -42,5 +41,3 @@ function generatePoissonArrivals(
 
   return arrivals;
 }
-
-
