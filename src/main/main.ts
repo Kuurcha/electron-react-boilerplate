@@ -14,13 +14,13 @@ import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
 import { resolveHtmlPath } from './util';
-import { NodeWinPcap } from 'node-win-pcap';
 import fs from 'fs';
 import os from 'os';
 import { getNetworkInterfaces } from './networkCapturer/functions';
 import { CaptureSettings } from '../bus/types';
 import { CaptureStatus, NetworkInterfaceInfo } from './networkCapturer/type';
 import { getAppRootFilePath } from './helpers/fileHelper';
+import { Sniffer } from './networkCapturer/sniffer';
 
 class AppUpdater {
   constructor() {
@@ -31,7 +31,7 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let activePcap: NodeWinPcap | null = null;
+let sniffer: Sniffer | null = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
@@ -121,6 +121,7 @@ const createWindow = async () => {
   // Remove this if your app does not use auto updates
   // eslint-disable-next-line
   new AppUpdater();
+  sniffer = new Sniffer(mainWindow);
 };
 
 /**
@@ -135,149 +136,17 @@ app.on('window-all-closed', () => {
   }
 });
 
-/**
- * Logs messages with a timestamp and SNIFFER INFO tag.
- */
-function snifferLog(...messages: any[]) {
-  const timestamp = new Date().toISOString();
-  console.log(`[${timestamp}] SNIFFER INFO:`, ...messages);
-}
-
-function stopPacketSniffer() {
-  const logPath = path.join(process.cwd(), 'sniffer_log.txt');
-  const writeLog = (...messages: any[]) => {
-    const line = messages.map(String).join(' ') + '\n';
-    fs.appendFileSync(logPath, line);
-  };
-
-  if (activePcap) {
-    try {
-      activePcap.stop();
-      console.log('Packet sniffing manually stopped.');
-    } catch (e: any) {
-      console.log(`Error while stopping sniffer: ${e.message}`);
-    } finally {
-      activePcap = null;
-    }
-  } else {
-    console.log('No active sniffer to stop.');
-  }
-}
-
 app.on('before-quit', () => {
   console.log('App is quitting — stopping sniffer if running...');
-  stopPacketSniffer();
+  sniffer?.stopPacketSniffer();
 });
-
-function sendCaptureStatus(status: CaptureStatus) {
-  if (mainWindow) {
-    mainWindow.webContents.send('capture-status', status);
-  }
-}
-
-// TO DO: Убрать ANY
-function stopPacketCapture(activePcapRef: any, logPathRef: any) {
-  if (activePcapRef) {
-    activePcapRef.stop();
-    activePcapRef.removeAllListeners();
-    activePcapRef = null;
-    console.log('Packet sniffing stopped.');
-    sendCaptureStatus({
-      state: 'stopped',
-      message:
-        'Захват остановлен ввиду истечения длительности захвата или достижения лимита пакетов',
-      filePath: logPathRef,
-    });
-  }
-}
-
-/**
- * Starts a packet sniffer and logs only the moments of packet arrivals.
- * @param ipAddress - IP of the interface to capture on
- * @param durationSecStr - Duration in seconds (as string)
- */
-function startPacketSniffer(
-  ipAddress: string,
-  durationSecStr: string,
-  maxPackets: string,
-  logPath: string,
-) {
-  const durationSec = parseInt(durationSecStr, 10);
-  const maxPacketsInt = parseInt(maxPackets);
-  let currentPackets = 0;
-
-  if (Number.isNaN(durationSec) || durationSec <= 0) {
-    console.error('Invalid duration:', durationSecStr);
-    return;
-  }
-
-  logPath = logPath ?? path.join(process.cwd(), 'sniffer_log.txt');
-
-  // Clear existing log
-  fs.writeFileSync(logPath, '');
-
-  const startTime = process.hrtime.bigint(); // high-res start time
-
-  const writeLog = (timeSec: number) => {
-    const line = timeSec.toFixed(10).replace('.', ',') + '\n';
-    fs.appendFileSync(logPath, line);
-  };
-
-  try {
-    // Stop any previous capture
-    if (activePcap) {
-      activePcap.stop();
-      activePcap.removeAllListeners();
-      activePcap = null;
-    }
-
-    sendCaptureStatus({
-      state: 'running',
-      message: 'Захват начен',
-      filePath: logPath,
-    });
-
-    const pcap = new NodeWinPcap(ipAddress);
-    activePcap = pcap;
-
-    // Stop after duration
-    const timeoutId = setTimeout(() => {
-      stopPacketCapture(activePcap, logPath);
-    }, durationSec * 1000);
-
-    pcap.on('packet', () => {
-      currentPackets++;
-
-      console.log(currentPackets);
-      if (currentPackets >= maxPacketsInt) {
-        stopPacketCapture(activePcap, logPath);
-      }
-
-      const now = process.hrtime.bigint();
-      const deltaNs = Number(now - startTime); // nanoseconds
-      const deltaSec = deltaNs / 1_000_000_000; // convert to seconds
-      writeLog(deltaSec);
-    });
-
-    pcap.on('error', (err) => {
-      console.error('Sniffer error:', err);
-    });
-
-    pcap.start();
-    console.log(
-      `Packet sniffing started on ${ipAddress} for ${durationSec} seconds`,
-    );
-  } catch (e: any) {
-    console.error('Failed to start sniffing:', e.message);
-  }
-}
 
 ipcMain.handle('getNetworkInterfaces', async () => {
   return getNetworkInterfaces();
 });
 
 ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
-  stopPacketSniffer();
+  sniffer?.stopPacketSniffer();
 
   const currentInterfaces: NetworkInterfaceInfo[] = getNetworkInterfaces();
   const currentInterface = currentInterfaces.find(
@@ -287,7 +156,7 @@ ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
 
   console.log(`Starting capture on ${currentInterfaceIp}`);
 
-  startPacketSniffer(
+  sniffer?.startPacketSniffer(
     currentInterfaceIp,
     settings.duration,
     settings.maxPackets,
@@ -297,12 +166,12 @@ ipcMain.on('startCapture', (event, settings: CaptureSettings) => {
 
 ipcMain.on('stopCapture', () => {
   console.log('Stopping capture...');
-  sendCaptureStatus({
+  sniffer?.sendCaptureStatus({
     state: 'stopped',
     message: `Захват остановлен вручную`,
     filePath: '',
   });
-  stopPacketSniffer();
+  sniffer?.stopPacketSniffer();
 });
 
 ipcMain.handle('dialog:save-file', async (_) => {
