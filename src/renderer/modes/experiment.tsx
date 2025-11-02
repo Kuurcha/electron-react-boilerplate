@@ -20,6 +20,7 @@ import { Arrival } from '../../main/experiment/averageQueue/poisson/poisson';
 import { PoissonParams } from '../../main/networkCapturer/type';
 import CustomInput from '../components/input';
 import 'chartjs-adapter-moment';
+import Dropdown from '../components/dropdown';
 
 Chart.register(
   CategoryScale,
@@ -33,60 +34,204 @@ Chart.register(
   Legend,
 );
 
+type GraphConfig = {
+  id: string;
+  name: string;
+  getData: () => any;
+  getConfig: () => any;
+};
+
+/**
+ * Рассчитывает коэффициент загрузки ρ для односерверной очереди
+ */
+function calculateRho(params: PoissonParams): number {
+  // среднее время обслуживания
+  const meanServiceTime = 1 / params.mu;
+
+  // коэффициент загрузки
+  const rho = params.lambda / meanServiceTime;
+  return rho;
+}
+
+/**
+ * Условное среднее число заявок q(ρ)
+ * @param rho - коэффициент загрузки ρ (0 < ρ < 1)
+ * @returns условное среднее число заявок
+ */
+function qOfRho(rho: number): number {
+  if (rho <= 0 || rho >= 1) {
+    throw new Error('Коэффициент загрузки ρ должен быть в диапазоне (0, 1)');
+  }
+  return (rho * rho) / (2 * (1 - rho));
+}
+
 export default function Experiment() {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [poissonParams, setPoissonParams] = useState<PoissonParams>({
-    lambda: 10, // 10 заявки в секунду
-    mu: 2, // среднее время обслуживание 1/mu - 0.5 секунды
+    lambda: 100, // 10 заявки в секунду
+    mu: 0.007, // среднее время обслуживание (1/mu)
     totalTime: 10, // время моделирования
   });
 
-  const options: ChartProps<'line'>['options'] = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: true,
-        text: 'Chart.js Line Chart',
-      },
-    },
-    scales: {
-      x: {
-        // type: 'time',
-        // time: {
-        //   tooltipFormat: 'DD T',
-        // },
+  const [selectedGraph, setSelectedGraph] = useState<null | {
+    id: string;
+    name: string;
+    getData: () => any;
+    getConfig: () => any;
+  }>(null);
 
-        type: 'time',
-        title: {
-          display: true,
-          text: 'Date',
+  function getArrivalsGraphData() {
+    const sortedArrivals = [...arrivals].sort((a, b) => a.time - b.time);
+
+    const labels = sortedArrivals.map((a) => a.time.toFixed(2));
+    const dataValues = sortedArrivals.map(
+      (a) => a.intervalInfo?.overlapCount ?? 0,
+    );
+
+    return {
+      labels,
+      datasets: [
+        {
+          label: 'Overlaps / queue size',
+          data: dataValues,
+          fill: false,
+          borderColor: 'rgb(75, 192, 192)',
+          tension: 0.3,
+          pointRadius: 3,
+        },
+      ],
+    };
+  }
+  function getArrivalsGraphOptions() {
+    return {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' as const },
+        title: { display: true, text: 'Arrivals Over Time' },
+      },
+      scales: {
+        x: { title: { display: true, text: 'Time' } },
+        y: {
+          title: { display: true, text: 'Overlap Count' },
+          beginAtZero: true,
         },
       },
-      y: {
-        title: {
-          display: true,
-          text: 'value',
+    };
+  }
+
+  function getArrivalsGraphOptions2() {
+    return {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' as const },
+        title: { display: true, text: 'Arrivals Over Time2' },
+      },
+      scales: {
+        x: { title: { display: true, text: 'Time' } },
+        y: {
+          title: { display: true, text: 'Overlap Count2' },
+          beginAtZero: true,
         },
       },
-    },
-  };
+    };
+  }
 
-  const data: ChartProps<'line'>['data'] = {
-    datasets: [
-      {
-        label: 'Dataset 1',
-        data: arrivals.map<Point>((arrival: Arrival) => ({
-          x: arrival.time,
-          y: arrival.serviceTime,
-        })),
-        borderColor: 'rgb(255, 99, 132)',
-        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+  function getRandomGraphData() {
+    return {
+      labels: ['A', 'B', 'C', 'D'],
+      datasets: [
+        {
+          label: 'Random Data',
+          data: [10, 5, 8, 12],
+          fill: false,
+          borderColor: 'rgb(255, 99, 132)',
+          tension: 0.3,
+          pointRadius: 3,
+        },
+      ],
+    };
+  }
+
+  function getRandomGraphOptions() {
+    return {
+      responsive: true,
+      plugins: {
+        legend: { position: 'top' as const },
+        title: { display: true, text: 'Random Data Graph' },
       },
-    ],
-  };
+      scales: {
+        x: { title: { display: true, text: 'Category' } },
+        y: { title: { display: true, text: 'Value' }, beginAtZero: true },
+      },
+    };
+  }
+
+  const graphs = [
+    {
+      id: '1',
+      name: 'Arrivals Over Time',
+      getData: getArrivalsGraphData,
+      getConfig: getArrivalsGraphOptions,
+    },
+    {
+      id: '2',
+      name: 'Arrivals Over Meow',
+      getData: getArrivalsGraphData,
+      getConfig: getArrivalsGraphOptions2,
+    },
+    {
+      id: '3',
+      name: 'Random Graph',
+      getData: getRandomGraphData,
+      getConfig: getRandomGraphOptions,
+    },
+  ];
+
+  // const options: ChartProps<'line'>['options'] = {
+  //   responsive: true,
+  //   plugins: {
+  //     legend: {
+  //       position: 'top' as const,
+  //     },
+  //     title: {
+  //       display: true,
+  //       text: 'Chart.js Line Chart',
+  //     },
+  //   },
+  //   scales: {
+  //     x: {
+  //       // type: 'time',
+  //       // time: {
+  //       //   tooltipFormat: 'DD T',
+  //       // },
+  //       // type: 'time',
+  //       // title: {
+  //       //   display: true,
+  //       //   text: 'Date',
+  //       // },
+  //     },
+  //     y: {
+  //       title: {
+  //         display: true,
+  //         text: 'value',
+  //       },
+  //     },
+  //   },
+  // };
+
+  // const data: ChartProps<'line'>['data'] = {
+  //   datasets: [
+  //     {
+  //       label: 'Dataset 1',
+  //       data: arrivals.map<Point>((arrival: Arrival) => ({
+  //         x: arrival.time,
+  //         y: arrival.serviceTime,
+  //       })),
+  //       borderColor: 'rgb(255, 99, 132)',
+  //       backgroundColor: 'rgba(255, 99, 132, 0.5)',
+  //     },
+  //   ],
+  // };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -101,6 +246,21 @@ export default function Experiment() {
     try {
       console.log('test');
       const result = await window.electron.getPoissonStream(poissonParams);
+
+      if (result && result.length > 0) {
+        // если структура такая, как в enrichArrivals()
+        const overlapSum = result.reduce((sum, item) => {
+          return sum + (item.intervalInfo?.overlapCount ?? 0);
+        }, 0);
+
+        const avgQueueSize = overlapSum / result.length;
+
+        console.log('Average queue size (mean overlap):', avgQueueSize);
+      }
+
+      const coefficientOfLoad = calculateRho(poissonParams);
+      console.log('calculateRho: ', calculateRho(poissonParams));
+      console.log('Average size by formula:  ', qOfRho(coefficientOfLoad));
       console.log(result);
       setArrivals(result);
     } catch (error) {
@@ -112,6 +272,12 @@ export default function Experiment() {
     handleGetPoissonStream();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const items = graphs.map((g) => ({
+    id: g.id,
+    label: g.name,
+    onClick: () => setSelectedGraph(g),
+  }));
 
   return (
     <div className="flex flex-col flex-1">
@@ -152,6 +318,10 @@ export default function Experiment() {
             />
           </div>
         </div>
+        <Dropdown
+          label={selectedGraph ? selectedGraph.name : 'Выберите график'}
+          items={items}
+        />
         {/* <div className="flex justify-center mt-4">
         <button
           onClick={handleGetPoissonStream}
@@ -162,10 +332,14 @@ export default function Experiment() {
         </button>
       </div> */}
       </div>
-      <div className="bg-white p-8 flex-1">
-        {' '}
-        <Line options={options} data={data} />
-      </div>
+      {selectedGraph && (
+        <div className="bg-white p-8 flex-1 mt-4">
+          <Line
+            options={selectedGraph.getConfig()}
+            data={selectedGraph.getData()}
+          />
+        </div>
+      )}
     </div>
   );
 }
