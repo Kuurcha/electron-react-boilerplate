@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import {
   Chart,
@@ -60,18 +60,35 @@ function calculateRho(params: PoissonParams): number {
  */
 function qOfRho(rho: number): number {
   if (rho <= 0 || rho >= 1) {
-    throw new Error('Коэффициент загрузки ρ должен быть в диапазоне (0, 1)');
+    return -1;
   }
-  return (rho * rho) / (2 * (1 - rho));
+
+  //qp для пуассоновского потока = p^2/2(1-p)
+  const qp = (rho * rho) / (2 * (1 - rho));
+  const bigQP = qp / rho;
+  return bigQP;
 }
 
 export default function Experiment() {
   const [arrivals, setArrivals] = useState<Arrival[]>([]);
   const [poissonParams, setPoissonParams] = useState<PoissonParams>({
     lambda: 100, // 10 заявки в секунду
-    mu: 0.007, // среднее время обслуживание (1/mu)
+    mu: 0.008, // среднее время обслуживание (1/mu)
     totalTime: 10, // время моделирования
   });
+
+  const [coefficientOfLoad, _setCoefficientOfLoad] = useState<number>(0);
+
+  const setCoefficientOfLoad = (value: number) => {
+    _setCoefficientOfLoad(value > 1 ? 1 : value);
+  };
+
+  const [
+    HichinPollaczekAverageQueueSize,
+    setHichinPollaczekAverageAverageQueueSize,
+  ] = useState<number>(0);
+  const [calculatedAverageQueueSize, setCalculatedAverageQueueSize] =
+    useState<number>(0);
 
   const [selectedGraph, setSelectedGraph] = useState<null | {
     id: string;
@@ -79,6 +96,8 @@ export default function Experiment() {
     getData: () => any;
     getConfig: () => any;
   }>(null);
+
+  const chartRef = useRef<Chart<'line'>>(null);
 
   function getArrivalsGraphData() {
     const sortedArrivals = [...arrivals].sort((a, b) => a.time - b.time);
@@ -102,17 +121,25 @@ export default function Experiment() {
       ],
     };
   }
+
   function getArrivalsGraphOptions() {
     return {
       responsive: true,
       plugins: {
         legend: { position: 'top' as const },
-        title: { display: true, text: 'Arrivals Over Time' },
+        title: {
+          display: true,
+          text: `Коэф. загрузки ρ: ${coefficientOfLoad.toFixed(
+            2,
+          )}, Q(ρ): ${HichinPollaczekAverageQueueSize.toFixed(
+            2,
+          )}, Фактическое Среднее: ${calculatedAverageQueueSize.toFixed(2)}`,
+        },
       },
       scales: {
-        x: { title: { display: true, text: 'Time' } },
+        x: { title: { display: true, text: 'Время' } },
         y: {
-          title: { display: true, text: 'Overlap Count' },
+          title: { display: true, text: 'Список пересечений' },
           beginAtZero: true,
         },
       },
@@ -166,7 +193,7 @@ export default function Experiment() {
     };
   }
 
-  const graphs = [
+  const getGraphs = () => [
     {
       id: '1',
       name: 'Arrivals Over Time',
@@ -186,6 +213,7 @@ export default function Experiment() {
       getConfig: getRandomGraphOptions,
     },
   ];
+  let graphs = getGraphs();
 
   // const options: ChartProps<'line'>['options'] = {
   //   responsive: true,
@@ -235,13 +263,35 @@ export default function Experiment() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const newValue = Number(value) < 1 ? '1' : value;
+    const newValue = Number(value) < 0 ? '1' : value;
     setPoissonParams((prev) => ({
       ...prev,
       [name]: newValue,
     }));
   };
 
+  useEffect(() => {
+    if (chartRef.current) {
+      const chart = chartRef.current;
+
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      graphs = getGraphs();
+      const newGraph = graphs.find((g) => g.id === selectedGraph?.id);
+
+      if (!newGraph) {
+        return;
+      }
+      setSelectedGraph(newGraph);
+      chart.config.options = newGraph?.getConfig();
+      chart.config.data = newGraph?.getData();
+      chart.update();
+    }
+  }, [
+    coefficientOfLoad,
+    HichinPollaczekAverageQueueSize,
+    calculatedAverageQueueSize,
+    arrivals,
+  ]);
   const handleGetPoissonStream = async () => {
     try {
       console.log('test');
@@ -254,13 +304,18 @@ export default function Experiment() {
         }, 0);
 
         const avgQueueSize = overlapSum / result.length;
-
+        setCalculatedAverageQueueSize(avgQueueSize);
         console.log('Average queue size (mean overlap):', avgQueueSize);
       }
 
-      const coefficientOfLoad = calculateRho(poissonParams);
-      console.log('calculateRho: ', calculateRho(poissonParams));
-      console.log('Average size by formula:  ', qOfRho(coefficientOfLoad));
+      const newCoefficientOfLoad = calculateRho(poissonParams);
+
+      setCoefficientOfLoad(calculateRho(poissonParams));
+
+      //q(p)
+      const bigQP = qOfRho(newCoefficientOfLoad);
+      setHichinPollaczekAverageAverageQueueSize(bigQP);
+      console.log('bigQP:  ', HichinPollaczekAverageQueueSize);
       console.log(result);
       setArrivals(result);
     } catch (error) {
@@ -294,6 +349,13 @@ export default function Experiment() {
               placeholder="Максимум пакетов"
             />
           </div>
+          <button
+            onClick={handleGetPoissonStream}
+            type="button"
+            className="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+          >
+            Сгенрировать новый поток
+          </button>
         </div>
         <div className="flex flex-row space-x-2">
           <div className="flex-1">
@@ -317,11 +379,12 @@ export default function Experiment() {
               placeholder="Максимум пакетов"
             />
           </div>
+          <Dropdown
+            label={selectedGraph ? selectedGraph.name : 'Выберите график'}
+            items={items}
+          />
         </div>
-        <Dropdown
-          label={selectedGraph ? selectedGraph.name : 'Выберите график'}
-          items={items}
-        />
+
         {/* <div className="flex justify-center mt-4">
         <button
           onClick={handleGetPoissonStream}
@@ -335,6 +398,7 @@ export default function Experiment() {
       {selectedGraph && (
         <div className="bg-white p-8 flex-1 mt-4">
           <Line
+            ref={chartRef}
             options={selectedGraph.getConfig()}
             data={selectedGraph.getData()}
           />
